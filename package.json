@@ -1,0 +1,30 @@
+{
+  "name": "amp-task-management",
+  "version": "1.0.0",
+  "description": "Web UI to visualize and manage Amp task_list tasks with full CRUD operations",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "amp",
+    "ampcode",
+    "task-management",
+    "task-viewer",
+    "sourcegraph"
+  ],
+  "author": "tools-vnai-dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tools-vnai-dev/amp-task-management.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tools-vnai-dev/amp-task-management/issues"
+  },
+  "homepage": "https://github.com/tools-vnai-dev/amp-task-management#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

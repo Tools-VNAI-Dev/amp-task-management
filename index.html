@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amp Task Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/mermaid@10/dist/mermaid.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#1E293B',
+                        cta: '#2563EB',
+                        surface: '#0F172A',
+                        'surface-elevated': '#1E293B',
+                        'surface-hover': '#334155',
+                        accent: {
+                            amber: '#F59E0B',
+                            blue: '#3B82F6',
+                            green: '#10B981',
+                            red: '#EF4444',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Smooth transitions */
+        * { transition-property: color, background-color, border-color, box-shadow, opacity, transform; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 200ms; }
+        
+        /* Task card hover */
+        .task-card { cursor: pointer; }
+        .task-card:hover { transform: translateY(-2px); }
+        
+        /* Status indicators */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+        .status-open .status-dot { background: #F59E0B; }
+        .status-in_progress .status-dot { background: #3B82F6; animation: pulse 1s infinite; }
+        .status-completed .status-dot { background: #10B981; animation: none; }
+        
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1E293B; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748B; }
+        
+        /* Graph container */
+        #mermaid-container svg { max-width: 100%; height: auto; }
+        
+        /* Skeleton loading */
+        .skeleton { background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        
+        /* Focus states */
+        button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }
+        
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        }
+    </style>
+</head>
+<body class="bg-surface text-slate-100 min-h-screen font-sans antialiased">
+    <div class="min-h-screen flex flex-col">
+        <!-- Navigation -->
+        <nav class="sticky top-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-slate-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo -->
+                    <div class="flex items-center gap-3">
+                        <svg class="w-8 h-8 text-primary" viewBox="0 0 281 144" fill="currentColor">
+                            <path d="M236.014 20C260.431 20.0001 280.602 37.4115 280.603 64.7432C280.602 93.5337 260.065 114.166 233.52 114.166C224.158 114.166 215.639 112.422 208.63 108.49C202.886 105.27 198.203 100.605 194.919 94.3379L188.115 141.822L187.946 143.016H174.214L174.448 141.423L191.772 22.4941H205.372L203.937 31.3369C212.143 23.8608 223.2 20.0002 236.014 20ZM47.082 20.1543C56.4435 20.1543 65.0012 21.8991 72.0488 25.8486C77.8222 29.0831 82.5323 33.7713 85.8271 40.085L88.1201 23.6924L88.2861 22.4932H101.863L89.1611 110.633L88.9873 111.826H75.4092L76.7227 102.855C68.5854 110.456 57.3981 114.323 44.5889 114.323C20.1709 114.323 0.000167223 96.9087 0 69.5771C0.000149745 40.7854 20.54 20.1549 47.082 20.1543Z"/>
+                        </svg>
+                        <div>
+                            <h1 class="text-lg font-semibold text-white font-mono">Task Viewer</h1>
+                            <p class="text-xs text-slate-500">Visualize amp task_list</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="flex items-center gap-3">
+                        <button onclick="openCreateModal()" class="flex items-center gap-2 px-4 py-2 bg-accent-green hover:bg-green-600 rounded-lg text-sm font-medium text-white cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            <span class="hidden sm:inline">New Task</span>
+                        </button>
+                        <button onclick="loadTasks()" class="flex items-center gap-2 px-4 py-2 bg-surface-elevated hover:bg-surface-hover rounded-lg text-sm font-medium cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            <span class="hidden sm:inline">Refresh</span>
+                        </button>
+                        <button onclick="toggleView()" class="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-cta rounded-lg text-sm font-medium text-white cursor-pointer">
+                            <svg id="view-icon-list" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                            <svg id="view-icon-graph" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                            <span id="view-toggle-text">Graph</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="bg-surface-elevated rounded-xl p-5 border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-slate-500 text-sm font-medium">Total</p>
+                            <p class="text-3xl font-bold text-white font-mono mt-1" id="stat-total">—</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-surface-elevated rounded-xl p-5 border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-slate-500 text-sm font-medium">Open</p>
+                            <p class="text-3xl font-bold text-accent-amber font-mono mt-1" id="stat-open">—</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-accent-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-surface-elevated rounded-xl p-5 border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-slate-500 text-sm font-medium">In Progress</p>
+                            <p class="text-3xl font-bold text-accent-blue font-mono mt-1" id="stat-progress">—</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-accent-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-surface-elevated rounded-xl p-5 border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-slate-500 text-sm font-medium">Completed</p>
+                            <p class="text-3xl font-bold text-accent-green font-mono mt-1" id="stat-completed">—</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-accent-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="flex flex-col sm:flex-row gap-4 mb-6">
+                <select id="filter-status" onchange="filterTasks()" class="bg-surface-elevated border border-slate-700 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-200 cursor-pointer focus:border-primary">
+                    <option value="all">All Status</option>
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                </select>
+                <select id="filter-repo" onchange="filterTasks()" class="bg-surface-elevated border border-slate-700 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-200 cursor-pointer focus:border-primary">
+                    <option value="all">All Repositories</option>
+                </select>
+                <div class="relative flex-1">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" id="search" placeholder="Search tasks..." onkeyup="filterTasks()" 
+                           class="w-full bg-surface-elevated border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:border-primary">
+                </div>
+            </div>
+
+            <!-- Loading skeleton -->
+            <div class="space-y-3 hidden" id="loading-skeleton">
+                <div class="skeleton h-24 rounded-xl"></div>
+                <div class="skeleton h-24 rounded-xl"></div>
+                <div class="skeleton h-24 rounded-xl"></div>
+            </div>
+
+            <!-- Task List View -->
+            <div id="list-view" class="space-y-3"></div>
+
+            <!-- Graph View -->
+            <div id="graph-view" class="hidden">
+                <div class="bg-surface-elevated rounded-xl border border-slate-800 p-6 overflow-auto">
+                    <div id="mermaid-container" class="min-h-[400px] flex items-center justify-center">
+                        <p class="text-slate-500">Loading graph...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-800 py-4">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <p class="text-center text-xs text-slate-600">
+                    Tasks synced from <span class="font-mono text-slate-500">ampcode.com</span> • Press <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-400">R</kbd> to refresh
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Task Detail Modal -->
+    <div id="task-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-surface-elevated rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl border border-slate-700">
+            <div class="flex items-start justify-between p-6 border-b border-slate-700">
+                <div class="flex-1 min-w-0 pr-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span id="modal-status" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"></span>
+                        <span id="modal-id" class="font-mono text-xs text-slate-500"></span>
+                    </div>
+                    <h2 id="modal-title" class="text-xl font-semibold text-white truncate"></h2>
+                </div>
+                <button onclick="closeModal()" class="p-2 hover:bg-slate-700 rounded-lg cursor-pointer shrink-0" aria-label="Close modal">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="modal-content" class="p-6 overflow-y-auto max-h-[calc(85vh-120px)]"></div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Task Modal -->
+    <div id="edit-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-surface-elevated rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl border border-slate-700">
+            <div class="flex items-center justify-between p-6 border-b border-slate-700">
+                <h2 id="edit-modal-title" class="text-xl font-semibold text-white">New Task</h2>
+                <button onclick="closeEditModal()" class="p-2 hover:bg-slate-700 rounded-lg cursor-pointer" aria-label="Close modal">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="task-form" class="p-6 space-y-5 overflow-y-auto max-h-[calc(85vh-140px)]">
+                <input type="hidden" id="edit-task-id">
+                
+                <div>
+                    <label for="edit-title" class="block text-sm font-medium text-slate-300 mb-2">Title <span class="text-red-400">*</span></label>
+                    <input type="text" id="edit-title" required placeholder="Task title..."
+                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary">
+                </div>
+                
+                <div>
+                    <label for="edit-description" class="block text-sm font-medium text-slate-300 mb-2">Description</label>
+                    <textarea id="edit-description" rows="5" placeholder="Task description, commands, acceptance criteria..."
+                              class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="edit-status" class="block text-sm font-medium text-slate-300 mb-2">Status</label>
+                        <select id="edit-status" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 cursor-pointer focus:border-primary">
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit-depends" class="block text-sm font-medium text-slate-300 mb-2">Depends On (IDs)</label>
+                        <input type="text" id="edit-depends" placeholder="e.g., 84, 85"
+                               class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:border-primary font-mono">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="edit-repo" class="block text-sm font-medium text-slate-300 mb-2">Repository URL</label>
+                    <input type="text" id="edit-repo" placeholder="https://github.com/user/repo"
+                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:border-primary font-mono text-sm">
+                </div>
+                
+                <div class="flex gap-3 pt-4 border-t border-slate-700">
+                    <button type="submit" id="edit-submit-btn" class="flex-1 bg-primary hover:bg-cta text-white font-medium py-3 px-4 rounded-lg cursor-pointer flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span id="edit-submit-text">Create Task</span>
+                    </button>
+                    <button type="button" onclick="closeEditModal()" class="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg cursor-pointer">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+        <div class="flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border" id="toast-content">
+            <svg id="toast-icon" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"></svg>
+            <span id="toast-message" class="text-sm font-medium"></span>
+        </div>
+    </div>
+
+    <script>
+        let allTasks = [];
+        let currentView = 'list';
+        const API_BASE = 'http://localhost:3847';
+        
+        mermaid.initialize({ 
+            startOnLoad: false, 
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#3B82F6',
+                primaryTextColor: '#F1F5F9',
+                primaryBorderColor: '#475569',
+                lineColor: '#64748B',
+                secondaryColor: '#1E293B',
+                tertiaryColor: '#0F172A',
+            },
+            flowchart: { 
+                curve: 'basis',
+                padding: 20,
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeModal();
+            if (e.key === 'r' || e.key === 'R') { e.preventDefault(); loadTasks(); }
+            if (e.key === 'g' || e.key === 'G') { e.preventDefault(); toggleView(); }
+        });
+
+        async function loadTasks() {
+            const skeleton = document.getElementById('loading-skeleton');
+            const listView = document.getElementById('list-view');
+            
+            if (skeleton) skeleton.classList.remove('hidden');
+            if (listView) listView.classList.add('hidden');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/tasks?limit=100`);
+                const data = await response.json();
+                
+                if (data.ok && data.result?.tasks) {
+                    allTasks = data.result.tasks;
+                    updateStats();
+                    updateRepoFilter();
+                    renderTasks();
+                    if (currentView === 'graph') renderGraph();
+                } else {
+                    showError('Failed to load tasks');
+                }
+            } catch (error) {
+                showError('Connection error. Ensure server is running.');
+            }
+            
+            if (skeleton) skeleton.classList.add('hidden');
+            if (listView) listView.classList.remove('hidden');
+        }
+
+        function updateStats() {
+            const total = allTasks.length;
+            const open = allTasks.filter(t => t.status === 'open').length;
+            const progress = allTasks.filter(t => t.status === 'in_progress').length;
+            const completed = allTasks.filter(t => t.status === 'completed').length;
+            
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-open').textContent = open;
+            document.getElementById('stat-progress').textContent = progress;
+            document.getElementById('stat-completed').textContent = completed;
+        }
+
+        function updateRepoFilter() {
+            const repos = [...new Set(allTasks.map(t => t.repoURL).filter(Boolean))];
+            const select = document.getElementById('filter-repo');
+            select.innerHTML = '<option value="all">All Repositories</option>' + 
+                repos.map(r => {
+                    const name = r.split('/').slice(-2).join('/');
+                    return `<option value="${r}">${name}</option>`;
+                }).join('');
+        }
+
+        function getFilteredTasks() {
+            const status = document.getElementById('filter-status').value;
+            const repo = document.getElementById('filter-repo').value;
+            const search = document.getElementById('search').value.toLowerCase();
+            
+            return allTasks.filter(task => {
+                if (status !== 'all' && task.status !== status) return false;
+                if (repo !== 'all' && task.repoURL !== repo) return false;
+                if (search && !task.title.toLowerCase().includes(search) && 
+                    !(task.description || '').toLowerCase().includes(search)) return false;
+                return true;
+            });
+        }
+
+        function filterTasks() {
+            renderTasks();
+            if (currentView === 'graph') renderGraph();
+        }
+
+        function getStatusConfig(status) {
+            const configs = {
+                open: { bg: 'bg-amber-500/10', text: 'text-amber-400', label: 'Open' },
+                in_progress: { bg: 'bg-blue-500/10', text: 'text-blue-400', label: 'In Progress' },
+                completed: { bg: 'bg-green-500/10', text: 'text-green-400', label: 'Completed' },
+            };
+            return configs[status] || configs.open;
+        }
+
+        function renderTasks() {
+            const tasks = getFilteredTasks();
+            const container = document.getElementById('list-view');
+            
+            if (tasks.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-16">
+                        <svg class="w-16 h-16 mx-auto text-slate-700 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        <p class="text-slate-500 text-lg">No tasks found</p>
+                        <p class="text-slate-600 text-sm mt-1">Try adjusting your filters</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = tasks.map(task => {
+                const statusConfig = getStatusConfig(task.status);
+                const hasBlockers = task.dependsOn?.length > 0;
+                
+                return `
+                    <div class="task-card status-${task.status} bg-surface-elevated hover:bg-surface-hover rounded-xl p-5 border border-slate-800 hover:border-slate-700" onclick="showTaskDetail('${task.id}')">
+                        <div class="flex items-start gap-4">
+                            <div class="shrink-0 mt-1">
+                                <div class="status-dot"></div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex flex-wrap items-center gap-2 mb-2">
+                                    <span class="font-mono text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-400">#${task.id}</span>
+                                    <span class="${statusConfig.bg} ${statusConfig.text} text-xs font-medium px-2 py-0.5 rounded-full">${statusConfig.label}</span>
+                                    ${hasBlockers ? `<span class="text-xs text-red-400/80 flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                        Blocked by ${task.dependsOn.length}
+                                    </span>` : ''}
+                                </div>
+                                <h3 class="text-white font-medium mb-1 line-clamp-1">${escapeHtml(task.title)}</h3>
+                                ${task.description ? `<p class="text-slate-400 text-sm line-clamp-2">${escapeHtml(task.description.slice(0, 120))}</p>` : ''}
+                            </div>
+                            <div class="shrink-0">
+                                <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function renderGraph() {
+            const tasks = getFilteredTasks();
+            const container = document.getElementById('mermaid-container');
+            
+            if (tasks.length === 0) {
+                container.innerHTML = '<p class="text-slate-500">No tasks to visualize</p>';
+                return;
+            }
+
+            let mermaidCode = 'flowchart TD\n';
+            
+            // Nodes
+            tasks.forEach(task => {
+                const statusClass = task.status === 'completed' ? ':::done' : 
+                                   task.status === 'in_progress' ? ':::active' : ':::pending';
+                const title = task.title.replace(/"/g, "'").replace(/[\[\]]/g, '').slice(0, 35);
+                mermaidCode += `    T${task.id}["#${task.id}: ${title}"]${statusClass}\n`;
+            });
+            
+            // Edges
+            const taskIds = new Set(tasks.map(t => t.id));
+            tasks.forEach(task => {
+                if (task.dependsOn) {
+                    task.dependsOn.forEach(depId => {
+                        if (taskIds.has(depId)) {
+                            mermaidCode += `    T${depId} --> T${task.id}\n`;
+                        }
+                    });
+                }
+            });
+            
+            mermaidCode += `
+    classDef pending fill:#1E293B,stroke:#F59E0B,color:#F1F5F9
+    classDef active fill:#1E3A5F,stroke:#3B82F6,color:#F1F5F9
+    classDef done fill:#134E4A,stroke:#10B981,color:#F1F5F9
+            `;
+
+            try {
+                const { svg } = await mermaid.render('graph-' + Date.now(), mermaidCode);
+                container.innerHTML = svg;
+            } catch (e) {
+                container.innerHTML = `<p class="text-red-400">Graph rendering error</p>`;
+            }
+        }
+
+        function toggleView() {
+            const listView = document.getElementById('list-view');
+            const graphView = document.getElementById('graph-view');
+            const toggleText = document.getElementById('view-toggle-text');
+            const iconList = document.getElementById('view-icon-list');
+            const iconGraph = document.getElementById('view-icon-graph');
+            
+            if (currentView === 'list') {
+                listView.classList.add('hidden');
+                graphView.classList.remove('hidden');
+                toggleText.textContent = 'List';
+                iconList.classList.add('hidden');
+                iconGraph.classList.remove('hidden');
+                currentView = 'graph';
+                renderGraph();
+            } else {
+                graphView.classList.add('hidden');
+                listView.classList.remove('hidden');
+                toggleText.textContent = 'Graph';
+                iconGraph.classList.add('hidden');
+                iconList.classList.remove('hidden');
+                currentView = 'list';
+            }
+        }
+
+        function showTaskDetail(id) {
+            const task = allTasks.find(t => t.id === id);
+            if (!task) return;
+            
+            const statusConfig = getStatusConfig(task.status);
+            const modal = document.getElementById('task-modal');
+            
+            document.getElementById('modal-status').className = `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`;
+            document.getElementById('modal-status').innerHTML = `<span class="status-dot" style="width:6px;height:6px"></span>${statusConfig.label}`;
+            document.getElementById('modal-id').textContent = `ID: ${task.id}`;
+            document.getElementById('modal-title').textContent = task.title;
+            
+            document.getElementById('modal-content').innerHTML = `
+                <div class="space-y-6">
+                    ${task.description ? `
+                    <div>
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Description</h4>
+                        <pre class="whitespace-pre-wrap text-sm text-slate-300 bg-slate-800/50 p-4 rounded-lg font-mono leading-relaxed overflow-x-auto">${escapeHtml(task.description)}</pre>
+                    </div>
+                    ` : ''}
+                    
+                    ${task.dependsOn?.length ? `
+                    <div>
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Blocked By</h4>
+                        <div class="flex flex-wrap gap-2">
+                            ${task.dependsOn.map(depId => {
+                                const depTask = allTasks.find(t => t.id === depId);
+                                return `<button onclick="showTaskDetail('${depId}')" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-sm cursor-pointer">
+                                    <span class="font-mono text-slate-400">#${depId}</span>
+                                    ${depTask ? `<span class="text-slate-300 truncate max-w-[150px]">${escapeHtml(depTask.title)}</span>` : ''}
+                                </button>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700">
+                        <div>
+                            <p class="text-xs text-slate-500 mb-1">Repository</p>
+                            <p class="text-sm text-slate-300 font-mono truncate">${task.repoURL ? task.repoURL.split('/').slice(-2).join('/') : 'N/A'}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500 mb-1">Created</p>
+                            <p class="text-sm text-slate-300">${new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 pt-4 border-t border-slate-700">
+                        <button onclick="openEditModal('${task.id}')" class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-cta text-white font-medium py-2.5 px-4 rounded-lg cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            Edit
+                        </button>
+                        <button onclick="updateTaskStatus('${task.id}', 'in_progress')" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg cursor-pointer ${task.status === 'in_progress' ? 'opacity-50 pointer-events-none' : ''}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            Start
+                        </button>
+                        <button onclick="updateTaskStatus('${task.id}', 'completed')" class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-4 rounded-lg cursor-pointer ${task.status === 'completed' ? 'opacity-50 pointer-events-none' : ''}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Complete
+                        </button>
+                        <button onclick="deleteTask('${task.id}')" class="flex items-center gap-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-medium py-2.5 px-4 rounded-lg cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('task-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function showError(message) {
+            document.getElementById('list-view').innerHTML = `
+                <div class="text-center py-16">
+                    <svg class="w-16 h-16 mx-auto text-red-500/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <p class="text-slate-300 text-lg mb-2">${escapeHtml(message)}</p>
+                    <p class="text-slate-500 text-sm mb-4">Make sure the server is running:</p>
+                    <code class="inline-block bg-slate-800 px-4 py-2 rounded-lg text-sm font-mono text-slate-300">node ~/.local/share/amp-task-viewer/server.js</code>
+                </div>
+            `;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Click outside modal to close
+        document.getElementById('task-modal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+        
+        document.getElementById('edit-modal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeEditModal();
+        });
+
+        // ==================== CRUD OPERATIONS ====================
+        
+        // Open create modal
+        function openCreateModal() {
+            document.getElementById('edit-modal-title').textContent = 'New Task';
+            document.getElementById('edit-submit-text').textContent = 'Create Task';
+            document.getElementById('edit-task-id').value = '';
+            document.getElementById('edit-title').value = '';
+            document.getElementById('edit-description').value = '';
+            document.getElementById('edit-status').value = 'open';
+            document.getElementById('edit-depends').value = '';
+            document.getElementById('edit-repo').value = '';
+            
+            const modal = document.getElementById('edit-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.getElementById('edit-title').focus();
+        }
+        
+        // Open edit modal with task data
+        function openEditModal(taskId) {
+            const task = allTasks.find(t => t.id === taskId);
+            if (!task) return;
+            
+            closeModal(); // Close detail modal first
+            
+            document.getElementById('edit-modal-title').textContent = 'Edit Task #' + taskId;
+            document.getElementById('edit-submit-text').textContent = 'Save Changes';
+            document.getElementById('edit-task-id').value = taskId;
+            document.getElementById('edit-title').value = task.title || '';
+            document.getElementById('edit-description').value = task.description || '';
+            document.getElementById('edit-status').value = task.status || 'open';
+            document.getElementById('edit-depends').value = (task.dependsOn || []).join(', ');
+            document.getElementById('edit-repo').value = task.repoURL || '';
+            
+            const modal = document.getElementById('edit-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+        
+        // Close edit modal
+        function closeEditModal() {
+            const modal = document.getElementById('edit-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        
+        // Handle form submission (create or update)
+        document.getElementById('task-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const taskId = document.getElementById('edit-task-id').value;
+            const title = document.getElementById('edit-title').value.trim();
+            const description = document.getElementById('edit-description').value.trim();
+            const status = document.getElementById('edit-status').value;
+            const dependsRaw = document.getElementById('edit-depends').value.trim();
+            const repoURL = document.getElementById('edit-repo').value.trim();
+            
+            // Parse depends on
+            const dependsOn = dependsRaw ? dependsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+            
+            const payload = { title, description, status, repoURL: repoURL || undefined, dependsOn };
+            
+            const submitBtn = document.getElementById('edit-submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50');
+            
+            try {
+                let response;
+                if (taskId) {
+                    // Update existing task
+                    response = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    // Create new task
+                    response = await fetch(`${API_BASE}/api/tasks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+                
+                const data = await response.json();
+                
+                if (data.ok) {
+                    showToast(taskId ? 'Task updated successfully' : 'Task created successfully', 'success');
+                    closeEditModal();
+                    await loadTasks();
+                } else {
+                    showToast(data.error || 'Failed to save task', 'error');
+                }
+            } catch (error) {
+                showToast('Connection error: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50');
+            }
+        });
+        
+        // Quick status update
+        async function updateTaskStatus(taskId, newStatus) {
+            try {
+                const response = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                
+                const data = await response.json();
+                
+                if (data.ok) {
+                    showToast(`Task marked as ${newStatus.replace('_', ' ')}`, 'success');
+                    closeModal();
+                    await loadTasks();
+                } else {
+                    showToast(data.error || 'Failed to update status', 'error');
+                }
+            } catch (error) {
+                showToast('Connection error: ' + error.message, 'error');
+            }
+        }
+        
+        // Delete task
+        async function deleteTask(taskId) {
+            if (!confirm('Are you sure you want to delete this task?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.ok) {
+                    showToast('Task deleted', 'success');
+                    closeModal();
+                    await loadTasks();
+                } else {
+                    showToast(data.error || 'Failed to delete task', 'error');
+                }
+            } catch (error) {
+                showToast('Connection error: ' + error.message, 'error');
+            }
+        }
+        
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const content = document.getElementById('toast-content');
+            const icon = document.getElementById('toast-icon');
+            const messageEl = document.getElementById('toast-message');
+            
+            messageEl.textContent = message;
+            
+            if (type === 'success') {
+                content.className = 'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border bg-green-900/90 border-green-700 text-green-100';
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>';
+            } else {
+                content.className = 'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border bg-red-900/90 border-red-700 text-red-100';
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>';
+            }
+            
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Initial load
+        loadTasks();
+    </script>
+</body>
+</html>
